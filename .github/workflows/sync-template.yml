@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      TARGET_REPO: ADCairex/test-template-proyecto-1
+      TARGET_REPO: ADCairex/test-template-project-1
 
     steps:
       - name: Checkout template repo
