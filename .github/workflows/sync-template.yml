@@ -1,16 +1,18 @@
 name: Sync Template to Proyecto 1
 
 on:
-  push:
+  pull_request:
+    types: [closed]
     branches:
-      - '*'
+      - main  # o develop si también quieres eso
 
 jobs:
-  sync:
+  sync-if-merged:
+    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
 
     env:
-      TARGET_REPO: ADCairex/test-template-project-1
+      TARGET_REPO: ADCairex/test-template-proyecto-1
 
     steps:
       - name: Checkout template repo
@@ -24,7 +26,7 @@ jobs:
       - name: Define dynamic branch name
         id: vars
         run: |
-          BRANCH_NAME="${GITHUB_REF#refs/heads/}-sync-template"
+          BRANCH_NAME="${GITHUB_HEAD_REF}-sync-template"
           echo "branch=$BRANCH_NAME" >> $GITHUB_OUTPUT
 
       - name: Clone target repo
@@ -32,16 +34,17 @@ jobs:
           git clone https://x-access-token:${{ secrets.PAT_FOR_TEMPLATE_PUSH }}@github.com/${{ env.TARGET_REPO }} target-repo
           cd target-repo
           git checkout -b "${{ steps.vars.outputs.branch }}"
+          cd ..
 
       - name: Copy all files from template to target
         run: |
-          rsync -av --delete --exclude '.git/' --exclude '.github/' ./ target-repo/
+          rsync -av --delete --exclude '.git/' --exclude '.github/' ./ target-repo
 
       - name: Commit and push changes
         run: |
           cd target-repo
           git add .
-          git commit -m "Sync from template: ${{ github.ref_name }}" || echo "No changes to commit"
+          git commit -m "Sync from template: ${{ github.head_ref }}" || echo "No changes to commit"
           git push origin "${{ steps.vars.outputs.branch }}"
 
       - name: Create Pull Request
@@ -49,8 +52,8 @@ jobs:
           cd target-repo
           gh auth login --with-token <<< "${{ secrets.PAT_FOR_TEMPLATE_PUSH }}"
           gh pr create \
-            --title "Sync from template (${{ github.ref_name }})" \
-            --body "This PR includes updates from the \`${{ github.ref_name }}\` branch of the template." \
+            --title "Sync from template (${{ github.head_ref }})" \
+            --body "This PR includes updates from the template PR: #${{ github.event.pull_request.number }}" \
             --head "${{ steps.vars.outputs.branch }}" \
             --base main \
             --repo ${{ env.TARGET_REPO }}
