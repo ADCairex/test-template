@@ -4,7 +4,7 @@ on:
   pull_request:
     types: [closed]
     branches:
-      - main  # o develop si también quieres eso
+      - main  # solo ejecuta si se mergea en main del template
 
 jobs:
   sync-if-merged:
@@ -23,7 +23,7 @@ jobs:
           git config --global user.name "Template Bot"
           git config --global user.email "bot@template.com"
 
-      - name: Define dynamic branch name
+      - name: Define sync branch name
         id: vars
         run: |
           BRANCH_NAME="${GITHUB_HEAD_REF}-sync-template"
@@ -36,24 +36,20 @@ jobs:
           git checkout -b "${{ steps.vars.outputs.branch }}"
           cd ..
 
-      - name: Copy all files from template to target
+      - name: Sync all template files to target repo
         run: |
           rsync -av --delete --exclude '.git/' --exclude '.github/' ./ target-repo
 
-      - name: Commit and push changes
+      - name: Commit and push
         run: |
           cd target-repo
           git add .
-          git commit -m "Sync from template: ${{ github.head_ref }}" || echo "No changes to commit"
+          git commit -m "Sync from template: PR #${{ github.event.pull_request.number }}" || echo "No changes to commit"
           git push origin "${{ steps.vars.outputs.branch }}"
 
-      - name: Create Pull Request
+      - name: Create PR in target project
         run: |
           cd target-repo
           gh auth login --with-token <<< "${{ secrets.PAT_FOR_TEMPLATE_PUSH }}"
           gh pr create \
-            --title "Sync from template (${{ github.head_ref }})" \
-            --body "This PR includes updates from the template PR: #${{ github.event.pull_request.number }}" \
-            --head "${{ steps.vars.outputs.branch }}" \
-            --base main \
-            --repo ${{ env.TARGET_REPO }}
+            --title "Sync fr
