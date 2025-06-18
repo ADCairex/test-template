@@ -41,7 +41,7 @@ jobs:
 
       - name: Sync template files into cloned repo
         run: |
-          rsync -av --delete --exclude '.git/' --exclude '.github/' ./ .tmp_repo/
+          rsync -av --delete --exclude '.git/' --exclude '.github/' ./ ./
 
       - name: Commit and push changes to target branch
         run: |
