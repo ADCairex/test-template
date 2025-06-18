@@ -1,15 +1,16 @@
-name: Sync Template to Proyecto 1
+name: sync-template-to-project-1
 
 on:
   pull_request:
     types: [closed]
     branches:
-      - main  # solo ejecuta si se mergea en main del template
+      - main  # o la rama en la que haces merge en el template
 
 jobs:
-  sync-if-merged:
-    if: github.event.pull_request.merged == true
+  sync_template:
+    name: Sync template to test-template-project-1
     runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == true
 
     env:
       TARGET_REPO: ADCairex/test-template-project-1
@@ -17,17 +18,18 @@ jobs:
     steps:
       - name: Checkout template repo
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.PAT_FOR_TEMPLATE_PUSH }}
 
-      - name: Set up Git
+      - name: Set up Git config
         run: |
           git config --global user.name "Template Bot"
           git config --global user.email "bot@template.com"
 
-      - name: Define sync branch name
+      - name: Define branch name
         id: vars
-        run: |
-          BRANCH_NAME="${GITHUB_HEAD_REF}-sync-template"
-          echo "branch=$BRANCH_NAME" >> $GITHUB_OUTPUT
+        run: echo "branch=${{ github.event.pull_request.head.ref }}-sync-template" >> $GITHUB_OUTPUT
 
       - name: Clone target repo
         run: |
@@ -36,11 +38,11 @@ jobs:
           git checkout -b "${{ steps.vars.outputs.branch }}"
           cd ..
 
-      - name: Sync all template files to target repo
+      - name: Sync template content
         run: |
           rsync -av --delete --exclude '.git/' --exclude '.github/' ./ target-repo
 
-      - name: Commit and push
+      - name: Commit and push to new branch
         run: |
           cd target-repo
           git add .
@@ -48,8 +50,13 @@ jobs:
           git push origin "${{ steps.vars.outputs.branch }}"
 
       - name: Create PR in target project
+        env:
+          GH_TOKEN: ${{ secrets.PAT_FOR_TEMPLATE_PUSH }}
         run: |
           cd target-repo
-          gh auth login --with-token <<< "${{ secrets.PAT_FOR_TEMPLATE_PUSH }}"
           gh pr create \
-            --title "Sync fr
+            --title "Sync from template (PR #${{ github.event.pull_request.number }})" \
+            --body "Updates synced from template repo after PR merge." \
+            --head "${{ steps.vars.outputs.branch }}" \
+            --base main \
+            --repo ${{ env.TARGET_REPO }}
