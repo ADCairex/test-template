@@ -1,0 +1,56 @@
+name: Sync Template to Proyecto 1
+
+on:
+  push:
+    branches:
+      - '*'
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    env:
+      TARGET_REPO: ADCairex/test-template-proyecto-1
+
+    steps:
+      - name: Checkout template repo
+        uses: actions/checkout@v3
+
+      - name: Set up Git
+        run: |
+          git config --global user.name "Template Bot"
+          git config --global user.email "bot@template.com"
+
+      - name: Define dynamic branch name
+        id: vars
+        run: |
+          BRANCH_NAME="${GITHUB_REF#refs/heads/}-sync-template"
+          echo "branch=$BRANCH_NAME" >> $GITHUB_OUTPUT
+
+      - name: Clone target repo
+        run: |
+          git clone https://x-access-token:${{ secrets.PAT_FOR_TEMPLATE_PUSH }}@github.com/${{ env.TARGET_REPO }} target-repo
+          cd target-repo
+          git checkout -b "${{ steps.vars.outputs.branch }}"
+
+      - name: Copy all files from template to target
+        run: |
+          rsync -av --delete --exclude '.git/' --exclude '.github/' ./ target-repo/
+
+      - name: Commit and push changes
+        run: |
+          cd target-repo
+          git add .
+          git commit -m "Sync from template: ${{ github.ref_name }}" || echo "No changes to commit"
+          git push origin "${{ steps.vars.outputs.branch }}"
+
+      - name: Create Pull Request
+        run: |
+          cd target-repo
+          gh auth login --with-token <<< "${{ secrets.PAT_FOR_TEMPLATE_PUSH }}"
+          gh pr create \
+            --title "Sync from template (${{ github.ref_name }})" \
+            --body "This PR includes updates from the \`${{ github.ref_name }}\` branch of the template." \
+            --head "${{ steps.vars.outputs.branch }}" \
+            --base main \
+            --repo ${{ env.TARGET_REPO }}
