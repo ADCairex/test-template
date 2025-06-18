@@ -4,7 +4,7 @@ on:
   pull_request:
     types: [closed]
     branches:
-      - main  # o la rama en la que haces merge en el template
+      - main  # Ejecuta solo si se mergea en main del template
 
 jobs:
   sync_template:
@@ -27,24 +27,25 @@ jobs:
           git config --global user.name "Template Bot"
           git config --global user.email "bot@template.com"
 
-      - name: Define branch name
+      - name: Define sync branch name
         id: vars
-        run: echo "branch=${{ github.event.pull_request.head.ref }}-sync-template" >> $GITHUB_OUTPUT
-
-      - name: Clone target repo
         run: |
-          git clone https://x-access-token:${{ secrets.PAT_FOR_TEMPLATE_PUSH }}@github.com/${{ env.TARGET_REPO }} target-repo
-          cd target-repo
+          echo "branch=${{ github.event.pull_request.head.ref }}-sync-template" >> $GITHUB_OUTPUT
+
+      - name: Clone target repo into temp directory
+        run: |
+          git clone https://x-access-token:${{ secrets.PAT_FOR_TEMPLATE_PUSH }}@github.com/${{ env.TARGET_REPO }} .tmp_repo
+          cd .tmp_repo
           git checkout -b "${{ steps.vars.outputs.branch }}"
           cd ..
 
-      - name: Sync template content
+      - name: Sync template files into cloned repo
         run: |
-          rsync -av --delete --exclude '.git/' --exclude '.github/' ./ target-repo
+          rsync -av --delete --exclude '.git/' --exclude '.github/' ./ .tmp_repo/
 
-      - name: Commit and push to new branch
+      - name: Commit and push changes to target branch
         run: |
-          cd target-repo
+          cd .tmp_repo
           git add .
           git commit -m "Sync from template: PR #${{ github.event.pull_request.number }}" || echo "No changes to commit"
           git push origin "${{ steps.vars.outputs.branch }}"
@@ -53,10 +54,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.PAT_FOR_TEMPLATE_PUSH }}
         run: |
-          cd target-repo
+          cd .tmp_repo
           gh pr create \
             --title "Sync from template (PR #${{ github.event.pull_request.number }})" \
-            --body "Updates synced from template repo after PR merge." \
+            --body "This PR includes synchronized changes from the template repository after merging PR #${{ github.event.pull_request.number }}." \
             --head "${{ steps.vars.outputs.branch }}" \
             --base main \
             --repo ${{ env.TARGET_REPO }}
