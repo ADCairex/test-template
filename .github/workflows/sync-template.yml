@@ -68,7 +68,7 @@ jobs:
           fi
 
       - name: Crear issue con plantilla desde archivo
-        if: steps.push_changes.outputs.push_failed == 'true'
+        if: steps.push_changes.outputs.push_failed == 'false' # Invierto los ifs para probar la creación del issue
         env:
           GH_TOKEN: ${{ secrets.PAT_FOR_TEMPLATE_PUSH }}
         run: |
