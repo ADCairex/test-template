@@ -14,6 +14,7 @@ jobs:
 
     env:
       TARGET_REPO: ADCairex/test-template-project-1
+      TARGET_DIR: /tmp/test-template-project-1
 
     steps:
       - name: Checkout template repo
@@ -32,20 +33,19 @@ jobs:
         run: |
           echo "branch=${{ github.event.pull_request.head.ref }}-sync-template" >> $GITHUB_OUTPUT
 
-      - name: Clone target repo into temp directory
+      - name: Clone target repo into /tmp
         run: |
-          git clone https://x-access-token:${{ secrets.PAT_FOR_TEMPLATE_PUSH }}@github.com/${{ env.TARGET_REPO }} .tmp_repo
-          cd .tmp_repo
+          git clone https://x-access-token:${{ secrets.PAT_FOR_TEMPLATE_PUSH }}@github.com/${{ env.TARGET_REPO }} ${{ env.TARGET_DIR }}
+          cd ${{ env.TARGET_DIR }}
           git checkout -b "${{ steps.vars.outputs.branch }}"
-          cd ..
 
       - name: Sync template files into cloned repo
         run: |
-          rsync -av --delete --exclude '.git/' --exclude '.github/' ./ ./
+          rsync -av --delete --exclude '.git/' --exclude '.github/' ./ ${{ env.TARGET_DIR }}/
 
       - name: Commit and push changes to target branch
         run: |
-          cd .tmp_repo
+          cd ${{ env.TARGET_DIR }}
           git add .
           git commit -m "Sync from template: PR #${{ github.event.pull_request.head.ref }}" || echo "No changes to commit"
           git push origin "${{ steps.vars.outputs.branch }}"
@@ -54,10 +54,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.PAT_FOR_TEMPLATE_PUSH }}
         run: |
-          cd .tmp_repo
+          cd ${{ env.TARGET_DIR }}
           gh pr create \
             --title "Sync from template (PR #${{ github.event.pull_request.head.ref }})" \
-            --body "This PR includes synchronized changes from the template repository after merging PR #${{ github.event.pull_request.head.ref }}." \
+            --body "This PR incluye los cambios sincronizados desde el repositorio plantilla tras el merge del PR #${{ github.event.pull_request.head.ref }}." \
             --head "${{ steps.vars.outputs.branch }}" \
             --base main \
             --repo ${{ env.TARGET_REPO }}
