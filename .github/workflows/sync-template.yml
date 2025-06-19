@@ -68,7 +68,7 @@ jobs:
           fi
 
       - name: Create issue on conflict
-        if: steps.push_changes.outputs.push_failed == 'true'
+        if: steps.push_changes.outputs.push_failed == 'false' # Invierto los ifs para probar la creación del issue
         env:
           GH_TOKEN: ${{ secrets.PAT_FOR_TEMPLATE_PUSH }}
         run: |
@@ -91,7 +91,7 @@ jobs:
             --repo ${{ matrix.repo }}
 
       - name: Create PR in target project
-        if: steps.push_changes.outputs.push_failed == 'false'
+        if: steps.push_changes.outputs.push_failed == 'true' # Invierto los ifs para probar la creación del issue
         env:
           GH_TOKEN: ${{ secrets.PAT_FOR_TEMPLATE_PUSH }}
         run: |
