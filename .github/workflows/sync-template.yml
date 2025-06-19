@@ -82,12 +82,20 @@ jobs:
           fi
 
           gh issue create \
-            --title "❗ Conflicto al sincronizar desde el template" \
-            --body "⚠️ **Conflicto detectado al sincronizar el template en \`${{ matrix.repo }}\`**\n\n---\n\
-                        **🔀 Rama conflictiva:** \`${{ steps.vars.outputs.branch }}\`\n\
-                        **📌 Acción requerida:** Revisa la rama generada y resuelve los conflictos manualmente.\n\
-                        **🛠 Archivos en conflicto detectados:**\n${CONFLICT_FILES}\n\n\
-                        Este conflicto ocurrió tras el merge del PR #${{ github.event.pull_request.head.ref }} en el repositorio plantilla." \
+            --title "Conflicto al sincronizar desde el template" \
+            --body "$(cat <<EOF
+                  ❗ **Conflicto detectado al sincronizar el template en \`${{ matrix.repo }}\`**
+
+                  **🔀 Rama conflictiva:** [${{ steps.vars.outputs.branch }}](https://github.com/${{ matrix.repo }}/tree/${{ steps.vars.outputs.branch }})
+
+                  **📌 Acción requerida:** Revisa la rama y resuelve los conflictos manualmente.
+
+                  **🛠 Archivos en conflicto detectados:**
+                  ${CONFLICT_FILES}
+
+                  Este conflicto ocurrió tras el merge del PR #${{ github.event.pull_request.head.ref }} en el repositorio plantilla.
+                  EOF
+                  )" \
             --repo ${{ matrix.repo }}
 
       - name: Create PR in target project
