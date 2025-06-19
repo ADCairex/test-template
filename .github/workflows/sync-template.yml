@@ -49,13 +49,49 @@ jobs:
           rsync -av --delete --exclude '.git/' --exclude '.github/' ./ ${{ env.TARGET_DIR }}/
 
       - name: Commit and push changes
+        id: push_changes
         run: |
           cd ${{ env.TARGET_DIR }}
           git add .
           git commit -m "Sync from template: PR #${{ github.event.pull_request.head.ref }}" || echo "No changes to commit"
-          git push origin "${{ steps.vars.outputs.branch }}"
+
+          # Intentar hacer push
+          if ! git push origin "${{ steps.vars.outputs.branch }}"; then
+            echo "push_failed=true" >> $GITHUB_OUTPUT
+
+            # Intentar detectar archivos en conflicto
+            git fetch origin main
+            git merge origin/main || true
+            git diff --name-only --diff-filter=U > /tmp/conflict_files.txt || true
+          else
+            echo "push_failed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create issue on conflict
+        if: steps.push_changes.outputs.push_failed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.PAT_FOR_TEMPLATE_PUSH }}
+        run: |
+          cd ${{ env.TARGET_DIR }}
+
+          # Leer archivos en conflicto
+          if [ -s /tmp/conflict_files.txt ]; then
+            CONFLICT_FILES=$(cat /tmp/conflict_files.txt | sed 's/^/- /')
+          else
+            CONFLICT_FILES="No se pudo determinar los archivos en conflicto automáticamente. Revisa el estado del repositorio manualmente."
+          fi
+
+          gh issue create \
+            --title "❗ Conflicto al sincronizar desde el template" \
+            --body "⚠️ **Conflicto detectado al sincronizar el template en \`${{ matrix.repo }}\`**\n\n---\n\
+                        **🔀 Rama conflictiva:** \`${{ steps.vars.outputs.branch }}\`\n\
+                        **📌 Acción requerida:** Revisa la rama generada y resuelve los conflictos manualmente.\n\
+                        **🛠 Archivos en conflicto detectados:**\n${CONFLICT_FILES}\n\n\
+                        Este conflicto ocurrió tras el merge del PR #${{ github.event.pull_request.head.ref }} en el repositorio plantilla." \
+            --repo ${{ matrix.repo }}
 
       - name: Create PR in target project
+        if: steps.push_changes.outputs.push_failed == 'false'
         env:
           GH_TOKEN: ${{ secrets.PAT_FOR_TEMPLATE_PUSH }}
         run: |
