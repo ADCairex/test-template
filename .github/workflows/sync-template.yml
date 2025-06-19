@@ -67,35 +67,34 @@ jobs:
             echo "push_failed=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Create issue on conflict
-        if: steps.push_changes.outputs.push_failed == 'false' # Invierto los ifs para probar la creación del issue
+      - name: Crear issue con plantilla desde archivo
+        if: steps.push_changes.outputs.push_failed == 'true'
         env:
           GH_TOKEN: ${{ secrets.PAT_FOR_TEMPLATE_PUSH }}
         run: |
           cd ${{ env.TARGET_DIR }}
 
-          # Leer archivos en conflicto
+          # Construir lista de archivos en conflicto
           if [ -s /tmp/conflict_files.txt ]; then
             CONFLICT_FILES=$(cat /tmp/conflict_files.txt | sed 's/^/- /')
           else
             CONFLICT_FILES="No se pudo determinar los archivos en conflicto automáticamente. Revisa el estado del repositorio manualmente."
           fi
 
+          # Copiar plantilla y reemplazar variables
+          TEMPLATE_FILE="${{ github.workspace }}/.github/templates/issue_conflict.md"
+          ISSUE_BODY_FILE="/tmp/issue_body.md"
+
+          cat "$TEMPLATE_FILE" \
+            | sed "s|{{REPO}}|${{ matrix.repo }}|g" \
+            | sed "s|{{BRANCH}}|${{ steps.vars.outputs.branch }}|g" \
+            | sed "s|{{PR_NUMBER}}|${{ github.event.pull_request.number }}|g" \
+            | sed "s|{{CONFLICT_FILES}}|$CONFLICT_FILES|g" \
+            > "$ISSUE_BODY_FILE"
+
           gh issue create \
-            --title "Conflicto al sincronizar desde el template" \
-            --body "$(cat <<EOF
-                  ❗ **Conflicto detectado al sincronizar el template en \`${{ matrix.repo }}\`**
-
-                  **🔀 Rama conflictiva:** [${{ steps.vars.outputs.branch }}](https://github.com/${{ matrix.repo }}/tree/${{ steps.vars.outputs.branch }})
-
-                  **📌 Acción requerida:** Revisa la rama y resuelve los conflictos manualmente.
-
-                  **🛠 Archivos en conflicto detectados:**
-                  ${CONFLICT_FILES}
-
-                  Este conflicto ocurrió tras el merge del PR #${{ github.event.pull_request.head.ref }} en el repositorio plantilla.
-                  EOF
-                  )" \
+            --title "❗ Conflicto al sincronizar desde el template" \
+            --body-file "$ISSUE_BODY_FILE" \
             --repo ${{ matrix.repo }}
 
       - name: Create PR in target project
